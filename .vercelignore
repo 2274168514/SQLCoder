@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+README.md
+*.md
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+start-all.*
+服务启动说明.txt

@@ -2,9 +2,10 @@
   "name": "onlinejudge-platform",
   "version": "1.0.0",
   "description": "在线编程评测平台 - OnlineJudge Platform",
-  "main": "api_server.js",
+  "main": "api/server.js",
   "scripts": {
     "start": "node api_server.js",
+    "vercel-build": "echo 'No build process needed - static frontend project'",
     "start:frontend": "http-server -p 5020 -c-1 -o",
     "dev": "node api_server.js",
     "dev:frontend": "http-server -p 5020 -c-1 -o",

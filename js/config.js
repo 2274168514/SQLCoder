@@ -23,10 +23,20 @@ export const FRONTEND_PORT = 5020;
 export function getApiBase() {
   const currentPort = window.location.port;
   const hostname = window.location.hostname;
-  
+
+  // 检测Vercel环境
+  if (hostname.includes('vercel.app') || hostname === 'vercel.app') {
+    return '/api';  // Vercel环境使用相对路径
+  }
+
+  // 检测生产环境
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !currentPort) {
+    return '/api';  // 生产环境使用相对路径
+  }
+
   // 前端开发端口列表
   const frontendPorts = ['5020', '5021', '3000', '8080', '8000', ''];
-  
+
   if (frontendPorts.includes(currentPort) && (hostname === 'localhost' || hostname === '127.0.0.1')) {
     return `http://localhost:${API_PORT}/api`;
   } else if (currentPort === String(API_PORT)) {
