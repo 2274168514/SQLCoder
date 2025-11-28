@@ -1,5 +1,5 @@
 {
-  "name": "onlinejudge-platform",
+  "name": "sqlcoder-platform",
   "version": "1.0.0",
   "description": "在线编程评测平台 - OnlineJudge Platform",
   "main": "api/server.js",
