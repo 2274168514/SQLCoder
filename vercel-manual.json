@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "name": "SQLCoder-Platform",
+  "builds": [
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/server.js",
+      "use": "@vercel/node"
+    }
+  ]
+}
