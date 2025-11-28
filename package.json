@@ -9,7 +9,7 @@
     "start:frontend": "http-server -p 5020 -c-1 -o",
     "dev": "node api_server.js",
     "dev:frontend": "http-server -p 5020 -c-1 -o",
-    "build": "mkdir -p dist && cp -r public/* dist/ && echo 'Static build completed - dist directory ready'",
+    "build": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist')) fs.mkdirSync('dist', { recursive: true }); const copyRecursive = (src, dest) => { const exists = fs.existsSync(src); const stats = exists && fs.statSync(src); const isDirectory = exists && stats.isDirectory(); if (isDirectory) { fs.mkdirSync(dest, { recursive: true }); fs.readdirSync(src).forEach(childItemName => { copyRecursive(path.join(src, childItemName), path.join(dest, childItemName)); }); } else { fs.copyFileSync(src, dest); } }; copyRecursive('public', 'dist'); console.log('Static build completed - dist directory ready');\"",
     "serve": "python -m http.server 5020 --bind 0.0.0.0",
     "serve:8000": "python -m http.server 8000 --bind 0.0.0.0",
     "serve:3000": "python -m http.server 3000 --bind 0.0.0.0",
