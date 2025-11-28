@@ -47,52 +47,6 @@
         <div id="previewArea"></div>
     </div>
 
-    <script type="module">
-        import React from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { PPTXViewer } from './components/PPTXViewer';
-
-        function App() {
-            const [file, setFile] = React.useState(null);
-
-            React.useEffect(() => {
-                // 监听文件选择
-                const fileInput = document.getElementById('pptxFile');
-                if (fileInput) {
-                    fileInput.addEventListener('change', (e) => {
-                        const selectedFile = e.target.files[0];
-                        if (selectedFile && selectedFile.name.endsWith('.pptx')) {
-                            setFile({
-                                src: URL.createObjectURL(selectedFile),
-                                name: selectedFile.name
-                            });
-                        }
-                    });
-                }
-
-                // 自动触发文件选择
-                window.loadFile = () => {
-                    fileInput?.click();
-                };
-            }, []);
-
-            return (
-                <div>
-                    {file ? (
-                        <PPTXViewer src={file.src} name={file.name} />
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                            <p>请选择一个PPTX文件进行预览</p>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // 渲染应用
-        const container = document.getElementById('previewArea');
-        const root = createRoot(container);
-        root.render(<App />);
-    </script>
+    <script type="module" src="./test-pptx-app.tsx"></script>
 </body>
 </html>
