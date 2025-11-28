@@ -1,0 +1,54 @@
+{
+  "name": "onlinejudge-platform",
+  "version": "1.0.0",
+  "description": "在线编程评测平台 - OnlineJudge Platform",
+  "main": "api_server.js",
+  "scripts": {
+    "start": "node api_server.js",
+    "start:frontend": "http-server -p 5020 -c-1 -o",
+    "dev": "node api_server.js",
+    "dev:frontend": "http-server -p 5020 -c-1 -o",
+    "build": "echo 'No build process needed - this is a static frontend project'",
+    "serve": "python -m http.server 5020 --bind 0.0.0.0",
+    "serve:8000": "python -m http.server 8000 --bind 0.0.0.0",
+    "serve:3000": "python -m http.server 3000 --bind 0.0.0.0",
+    "start:all": "node start-all.js",
+    "start-markviz": "cd markviz-presenter && npm run dev"
+  },
+  "keywords": [
+    "onlinejudge",
+    "programming",
+    "education",
+    "javascript",
+    "html",
+    "css",
+    "web-editor",
+    "code-editor"
+  ],
+  "author": "OnlineJudge Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.0",
+    "bcrypt": "^5.1.1",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.5",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/onlinejudge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/onlinejudge/issues"
+  },
+  "homepage": "https://github.com/your-username/onlinejudge#readme"
+}

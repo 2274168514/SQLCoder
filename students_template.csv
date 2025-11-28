@@ -1,0 +1,11 @@
+username,fullName,email,studentId,password,grade,major,phone,class
+zhangsan,张三,zhangsan@student.edu,2021001,123123,2021级,计算机科学与技术,13800138001,计科2101
+lisi,李四,lisi@student.edu,2021002,123123,2021级,软件工程,13800138002,软工2101
+wangwu,王五,wangwu@student.edu,2021003,123123,2021级,数据科学,13800138003,数据2101
+zhaoliu,赵六,zhaoliu@student.edu,2021004,123123,2022级,人工智能,13800138004,人工智能2201
+sunqi,孙七,sunqi@student.edu,2021005,123123,2022级,网络工程,13800138005,网工2201
+zhouba,周八,zhouba@student.edu,2022001,123123,2022级,信息安全,13800138006,信息安全2201
+wujiu,吴九,wujiu@student.edu,2022002,123123,2023级,物联网工程,13800138007,物联网2301
+zhengshi,郑十,zhengshi@student.edu,2022003,123123,2023级,计算机科学与技术,13800138008,计科2301
+chenyi,陈一,chenyi@student.edu,2022004,123123,2023级,软件工程,13800138009,软工2301
+liner,林二,liner@student.edu,2022005,123123,2023级,数据科学,13800138010,数据2301

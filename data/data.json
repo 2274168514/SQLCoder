@@ -1,0 +1,104 @@
+{
+  "title": "编程语言流行度数据分析",
+  "labels": ["JavaScript", "Python", "Java", "TypeScript", "C#", "C++", "PHP", "Go", "Rust", "Swift"],
+  "values": [67.8, 63.9, 60.4, 38.5, 27.4, 23.5, 21.2, 18.3, 13.2, 11.5],
+  "description": "2024年开发者调查报告 - 编程语言流行度百分比",
+  "categories": {
+    "Web开发": ["JavaScript", "TypeScript", "PHP"],
+    "数据科学": ["Python", "R", "Julia"],
+    "移动开发": ["Swift", "Kotlin", "Dart"],
+    "系统编程": ["C++", "Rust", "Go", "C"],
+    "企业应用": ["Java", "C#", "Kotlin"]
+  },
+  "trends": [
+    {
+      "year": 2020,
+      "JavaScript": 67.7,
+      "Python": 44.1,
+      "Java": 40.2,
+      "TypeScript": 25.4,
+      "C#": 31.0,
+      "C++": 24.4,
+      "PHP": 26.2,
+      "Go": 8.8,
+      "Rust": 3.0,
+      "Swift": 4.9
+    },
+    {
+      "year": 2021,
+      "JavaScript": 69.5,
+      "Python": 48.2,
+      "Java": 35.4,
+      "TypeScript": 30.2,
+      "C#": 27.6,
+      "C++": 24.3,
+      "PHP": 21.98,
+      "Go": 9.55,
+      "Rust": 7.1,
+      "Swift": 5.1
+    },
+    {
+      "year": 2022,
+      "JavaScript": 65.82,
+      "Python": 48.07,
+      "Java": 33.27,
+      "TypeScript": 30.19,
+      "C#": 27.62,
+      "C++": 22.42,
+      "PHP": 20.87,
+      "Go": 13.24,
+      "Rust": 9.32,
+      "Swift": 4.91
+    },
+    {
+      "year": 2023,
+      "JavaScript": 63.61,
+      "Python": 49.28,
+      "Java": 30.19,
+      "TypeScript": 38.87,
+      "C#": 29.16,
+      "C++": 22.42,
+      "PHP": 18.98,
+      "Go": 13.76,
+      "Rust": 13.05,
+      "Swift": 5.1
+    },
+    {
+      "year": 2024,
+      "JavaScript": 67.8,
+      "Python": 63.9,
+      "Java": 30.4,
+      "TypeScript": 38.5,
+      "C#": 27.4,
+      "C++": 23.5,
+      "PHP": 21.2,
+      "Go": 18.3,
+      "Rust": 13.2,
+      "Swift": 11.5
+    }
+  ],
+  "salaryData": [
+    {"language": "Rust", "avgSalary": 90000, "range": "75000-120000"},
+    {"language": "Go", "avgSalary": 85000, "range": "70000-110000"},
+    {"language": "TypeScript", "avgSalary": 80000, "range": "65000-105000"},
+    {"language": "C++", "avgSalary": 78000, "range": "65000-100000"},
+    {"language": "Python", "avgSalary": 75000, "range": "60000-95000"},
+    {"language": "Java", "avgSalary": 72000, "range": "58000-90000"},
+    {"language": "C#", "avgSalary": 70000, "range": "55000-88000"},
+    {"language": "JavaScript", "avgSalary": 68000, "range": "50000-85000"},
+    {"language": "Swift", "avgSalary": 75000, "range": "60000-95000"},
+    {"language": "PHP", "avgSalary": 55000, "range": "40000-70000"}
+  ],
+  "learningResources": {
+    "JavaScript": ["MDN", "freeCodeCamp", "Codecademy"],
+    "Python": ["Python官方文档", "Real Python", "Coursera"],
+    "Java": ["Oracle官方教程", "Baeldung", "Spring框架"],
+    "TypeScript": ["TypeScript手册", "Angular教程", "React+TS"],
+    "C#": ["Microsoft Learn", ".NET官方文档", "Unity学习"],
+    "C++": ["C++标准文档", "cppreference.com", "LearnCpp"],
+    "PHP": ["PHP官方文档", "Laravel框架", "WordPress开发"],
+    "Go": ["Go Tour", "Effective Go", "Go by Example"],
+    "Rust": ["Rust Book", "Rust by Example", "Rustlings"],
+    "Swift": ["Swift官方文档", "Hacking with Swift", "Apple开发"]
+  }
+}

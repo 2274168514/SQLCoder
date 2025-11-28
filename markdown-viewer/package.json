@@ -1,0 +1,12 @@
+{
+  "name": "markdown-viewer",
+  "version": "1.0.0",
+  "description": "Markdown Viewer",
+  "main": "index.html",
+  "scripts": {
+    "dev": "http-server -p 5174 -c-1 -o"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

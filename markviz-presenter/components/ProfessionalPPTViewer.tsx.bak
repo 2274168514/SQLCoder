@@ -1,0 +1,413 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Download, AlertCircle } from 'lucide-react';
+
+interface ProfessionalPPTViewerProps {
+  src: string;
+  name: string;
+}
+
+interface Slide {
+  elements: any[];
+  width?: number;
+  height?: number;
+}
+
+interface PPTXData {
+  slides: Slide[];
+  pageSize: {
+    width: { value: number };
+    height: { value: number };
+  };
+}
+
+export const ProfessionalPPTViewer: React.FC<ProfessionalPPTViewerProps> = ({ src, name }) => {
+  const [pptxData, setPptxData] = useState<PPTXData | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 加载PPTX文件
+  useEffect(() => {
+    const loadPPTX = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('🔄 使用专业PPT解析器加载文件...');
+        const response = await fetch(src);
+        if (!response.ok) throw new Error('无法加载PPT文件');
+
+        const arrayBuffer = await response.arrayBuffer();
+
+        // 将ArrayBuffer转换为File对象
+        const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+        const file = new File([blob], name || 'presentation.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+
+        // 动态导入pptx-parser库
+        const { parse } = await import('pptx-parser');
+
+        // 使用专业PPT解析器
+        const parsedData = await parse(file, { flattenGroup: true });
+        console.log('✅ PPT解析成功，幻灯片数量:', parsedData.slides.length);
+
+        if (!parsedData.slides || parsedData.slides.length === 0) {
+          throw new Error('PPT文件中没有找到幻灯片内容');
+        }
+
+        setPptxData(parsedData);
+        setCurrentSlide(0);
+
+      } catch (err: any) {
+        console.error('PPT加载错误:', err);
+
+        let errorMessage = err.message || 'PPT文件解析失败';
+
+        // 提供详细的错误信息和建议
+        if (errorMessage.includes('fetch')) {
+          errorMessage += '\n\n建议：\n• 检查文件路径是否正确\n• 确认文件存在且可访问';
+        } else {
+          errorMessage += '\n\n建议：\n• 确保文件是有效的PPTX格式\n• 尝试重新导出为.pptx格式\n• 检查文件是否损坏';
+        }
+
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (src) {
+      loadPPTX();
+    }
+  }, [src]);
+
+  // 渲染幻灯片到Canvas
+  useEffect(() => {
+    if (pptxData && pptxData.slides && currentSlide < pptxData.slides.length && canvasRef.current) {
+      renderSlideToCanvas(pptxData.slides[currentSlide], canvasRef.current);
+    }
+  }, [pptxData, currentSlide]);
+
+  // 渲染幻灯片到Canvas
+  const renderSlideToCanvas = (slide: Slide, canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 使用pptxData中的页面尺寸，转换为像素
+    const scaleFactor = 1; // PPTX中的单位通常是EMU，需要转换
+    const width = pptxData?.pageSize?.width?.value ? pptxData.pageSize.width.value / 9525 : 960;
+    const height = pptxData?.pageSize?.height?.value ? pptxData.pageSize.height.value / 9525 : 540;
+
+    // 设置Canvas尺寸
+    canvas.width = width;
+    canvas.height = height;
+
+    // 清空画布
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 渲染幻灯片元素
+    if (slide && slide.elements && slide.elements.length > 0) {
+      slide.elements.forEach((element, index) => {
+        try {
+          renderElement(ctx, element, canvas.width, canvas.height);
+        } catch (elementError) {
+          console.warn(`渲染元素 ${index} 失败:`, elementError);
+        }
+      });
+    } else {
+      // 如果没有元素，显示占位文本
+      ctx.fillStyle = '#666666';
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`幻灯片 ${currentSlide + 1}`, canvas.width / 2, canvas.height / 2);
+    }
+  };
+
+  // 渲染单个元素
+  const renderElement = (ctx: CanvasRenderingContext2D, element: any, canvasWidth: number, canvasHeight: number) => {
+    const { type, x, y, width, height, text, style = {} } = element;
+
+    ctx.save();
+
+    // 转换坐标（PPTX坐标通常是以EMUs为单位）
+    const px = (x || 0) / 9525; // 转换为像素
+    const py = (y || 0) / 9525;
+    const pw = (width || 0) / 9525 || 200;
+    const ph = (height || 0) / 9525 || 50;
+
+    switch (type) {
+      case 'text':
+      case 'paragraph':
+        // 设置文本样式
+        ctx.fillStyle = style.color || '#000000';
+        ctx.font = `${style.bold ? 'bold' : 'normal'} ${style.italic ? 'italic' : 'normal'} ${style.fontSize || 18}px ${style.fontFamily || 'Arial'}`;
+        ctx.textAlign = style.textAlign || 'left';
+        ctx.textBaseline = 'top';
+
+        // 处理多行文本
+        if (Array.isArray(text)) {
+          text.forEach((line: string, index: number) => {
+            ctx.fillText(line || '', px, py + (index * (style.fontSize || 18)));
+          });
+        } else {
+          ctx.fillText(text || '', px, py);
+        }
+        break;
+
+      case 'shape':
+        // 绘制形状
+        ctx.fillStyle = style.fill || '#FFFFFF';
+        ctx.strokeStyle = style.stroke || '#000000';
+        ctx.lineWidth = style.strokeWidth || 1;
+
+        // 根据形状类型绘制
+        switch (element.shapeType) {
+          case 'rect':
+          case 'rectangle':
+            ctx.fillRect(px, py, pw, ph);
+            if (style.stroke) {
+              ctx.strokeRect(px, py, pw, ph);
+            }
+            break;
+
+          case 'circle':
+          case 'ellipse':
+            ctx.beginPath();
+            ctx.ellipse(px + pw/2, py + ph/2, pw/2, ph/2, 0, 0, 2 * Math.PI);
+            ctx.fill();
+            if (style.stroke) {
+              ctx.stroke();
+            }
+            break;
+
+          default:
+            // 默认矩形
+            ctx.fillRect(px, py, pw, ph);
+            break;
+        }
+
+        // 如果有文本，在形状上绘制文本
+        if (text) {
+          ctx.fillStyle = style.color || '#000000';
+          ctx.font = `${style.fontSize || 14}px ${style.fontFamily || 'Arial'}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, px + pw/2, py + ph/2);
+        }
+        break;
+
+      case 'image':
+        // 处理图片（这里简化处理，实际需要加载图片）
+        if (element.src) {
+          ctx.fillStyle = '#E0E0E0';
+          ctx.fillRect(px, py, pw, ph);
+          ctx.fillStyle = '#666666';
+          ctx.font = '14px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('图片', px + pw/2, py + ph/2);
+        }
+        break;
+
+      default:
+        console.log('未知元素类型:', type);
+        break;
+    }
+
+    ctx.restore();
+  };
+
+  // 导航功能
+  const goToSlide = (index: number) => {
+    if (pptxData && pptxData.slides && index >= 0 && index < pptxData.slides.length) {
+      setCurrentSlide(index);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      containerRef.current.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+    setIsFullscreen(!isFullscreen);
+  };
+
+  // 键盘导航
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowLeft':
+          goToSlide(currentSlide - 1);
+          break;
+        case 'ArrowRight':
+        case ' ':
+          goToSlide(currentSlide + 1);
+          break;
+        case 'Escape':
+          if (isFullscreen) {
+            toggleFullscreen();
+          }
+          break;
+        case 'f':
+        case 'F':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            toggleFullscreen();
+          }
+          break;
+      }
+    };
+
+    if (pptxData && pptxData.slides && pptxData.slides.length > 0) {
+      window.addEventListener('keydown', handleKeyPress);
+      return () => window.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [currentSlide, pptxData?.slides?.length, isFullscreen]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="ppt-viewer my-4 rounded-lg overflow-hidden border"
+      style={{ borderColor: 'var(--border)' }}
+    >
+      {/* 头部工具栏 */}
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ backgroundColor: 'var(--bg-secondary)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+            {name}
+          </span>
+          {pptxData && pptxData.slides && pptxData.slides.length > 0 && (
+            <span className="text-sm ml-2" style={{ color: 'var(--text-muted)' }}>
+              ({currentSlide + 1} / {pptxData.slides.length})
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded transition-colors hover:bg-opacity-80"
+            style={{ color: 'var(--text-secondary)' }}
+            title={isFullscreen ? '退出全屏' : '全屏'}
+          >
+            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+          <a
+            href={src}
+            download={name}
+            className="px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: 'white'
+            }}
+            title="下载PPT"
+          >
+            <Download size={14} />
+            下载
+          </a>
+        </div>
+      </div>
+
+      {/* Canvas渲染区域 */}
+      <div
+        className={`relative w-full flex items-center justify-center ${isFullscreen ? 'flex-1' : ''}`}
+        style={{
+          height: isFullscreen ? 'calc(100vh - 120px)' : '540px',
+          backgroundColor: 'var(--bg-tertiary)'
+        }}
+      >
+        {loading ? (
+          <div className="flex flex-col items-center gap-4" style={{ color: 'var(--text-secondary)' }}>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}></div>
+            <p>正在解析PPT...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-4 px-8 text-center max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
+            <AlertCircle size={48} style={{ color: 'var(--warning)', opacity: 0.7 }} />
+            <div className="text-sm leading-relaxed">
+              {error.split('\n').map((line, index) => (
+                <div key={index} className={index === 0 ? 'font-medium mb-2' : 'text-xs mt-1'}>
+                  {line.startsWith('•') ? (
+                    <span className="block text-left pl-4">• {line.slice(1).trim()}</span>
+                  ) : (
+                    line
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : pptxData && pptxData.slides && pptxData.slides.length > 0 ? (
+          <>
+            <canvas
+              ref={canvasRef}
+              className="shadow-lg"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                backgroundColor: 'white'
+              }}
+            />
+
+            {/* 导航按钮 */}
+            {currentSlide > 0 && (
+              <button
+                onClick={() => goToSlide(currentSlide - 1)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full transition-colors hover:scale-110 shadow-lg"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)'
+                }}
+                title="上一张 (←)"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+            {pptxData && currentSlide < pptxData.slides.length - 1 && (
+              <button
+                onClick={() => goToSlide(currentSlide + 1)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full transition-colors hover:scale-110 shadow-lg"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)'
+                }}
+                title="下一张 (→)"
+              >
+                <ChevronRight size={24} />
+              </button>
+            )}
+
+            {/* 幻灯片指示器 */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {pptxData.slides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => goToSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    index === currentSlide
+                      ? 'w-8 opacity-100'
+                      : 'opacity-50 hover:opacity-75'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--text-secondary)'
+                  }}
+                  title={`转到幻灯片 ${index + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="text-center" style={{ color: 'var(--text-muted)' }}>
+            <p>没有找到幻灯片内容</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
