@@ -4,6 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>编程教学平台 - 登录</title>
+    <!-- 抑制浏览器扩展产生的无关错误 -->
+    <script>
+        // 静默处理浏览器扩展相关的错误
+        window.addEventListener('error', function(e) {
+            if (e.message && (
+                e.message.includes('Could not establish connection') ||
+                e.message.includes('message channel closed') ||
+                e.message.includes('Receiving end does not exist') ||
+                e.message.includes('Extension context invalidated')
+            )) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }, true);
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            if (e.reason && e.reason.message && (
+                e.reason.message.includes('Could not establish connection') ||
+                e.reason.message.includes('message channel closed') ||
+                e.reason.message.includes('Receiving end does not exist') ||
+                e.reason.message.includes('Extension context invalidated')
+            )) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -814,9 +842,12 @@
             button.disabled = true;
             button.textContent = '登录中...';
 
+            console.log('🔐 开始登录...', username);
+
             try {
                 // 调用登录API
                 const result = await userAuth.login(username, password);
+                console.log('📩 登录结果:', result);
 
                 if (result.success) {
                     // 记住我功能
@@ -826,6 +857,7 @@
                         localStorage.removeItem('remembered-user');
                     }
 
+                    console.log('✅ 登录成功，正在跳转...');
                     // 登录成功，跳转到主页
                     window.location.href = 'main.html';
                 } else {
@@ -833,9 +865,9 @@
                     errorEl.style.display = 'block';
                 }
             } catch (error) {
-                errorEl.textContent = '网络错误，请重试';
+                console.error('❌ 登录错误:', error);
+                errorEl.textContent = error.message || '网络错误，请重试';
                 errorEl.style.display = 'block';
-                console.error('Login error:', error);
             } finally {
                 // 恢复按钮
                 button.disabled = false;
@@ -1010,11 +1042,48 @@
             }
         }
 
+        // 显示注册成功提示
+        function showRegisterSuccess(username, password) {
+            // 使用自定义提示而不是alert，确保显示
+            const successModal = document.createElement('div');
+            successModal.id = 'success-modal';
+            successModal.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.7); display: flex; align-items: center;
+                justify-content: center; z-index: 10000;
+            `;
+            successModal.innerHTML = `
+                <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                    padding: 30px; border-radius: 16px; text-align: center; max-width: 400px;
+                    border: 1px solid rgba(52, 152, 219, 0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+                    <div style="font-size: 60px; margin-bottom: 20px;">✅</div>
+                    <h2 style="color: #3498db; margin-bottom: 15px; font-size: 24px;">注册成功！</h2>
+                    <p style="color: #bdc3c7; margin-bottom: 10px;">用户名：<strong style="color: #fff;">${username}</strong></p>
+                    <p style="color: #bdc3c7; margin-bottom: 20px;">密码：<strong style="color: #fff;">${password}</strong></p>
+                    <p style="color: #95a5a6; font-size: 14px; margin-bottom: 20px;">您现在可以使用此账号登录系统</p>
+                    <button onclick="document.getElementById('success-modal').remove()" 
+                        style="background: linear-gradient(135deg, #3498db, #2980b9); color: white;
+                        border: none; padding: 12px 40px; border-radius: 8px; cursor: pointer;
+                        font-size: 16px; font-weight: bold;">
+                        确定
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(successModal);
+        }
+
         // 处理用户注册
         async function handleRegister(event) {
             const formData = new FormData(event.target);
             const password = formData.get('password');
             const confirmPassword = formData.get('confirmPassword');
+            const role = formData.get('role');
+
+            // 验证角色是否选择
+            if (!role) {
+                alert('请先选择用户角色（学生或教师）！');
+                return;
+            }
 
             // 验证密码
             if (password !== confirmPassword) {
@@ -1027,12 +1096,18 @@
                 return;
             }
 
+            // 验证必填字段
+            if (!formData.get('fullName') || !formData.get('username')) {
+                alert('请填写真实姓名和用户名！');
+                return;
+            }
+
             const userData = {
                 fullName: formData.get('fullName'),
                 username: formData.get('username'),
                 password: password,
                 email: formData.get('email') || '',
-                role: formData.get('role'),
+                role: role,
                 studentId: formData.get('studentId') || '',
                 major: formData.get('major') || '',
                 grade: formData.get('grade') || '',
@@ -1041,26 +1116,74 @@
                 phone: formData.get('phone') || ''
             };
 
-            try {
-                const response = await fetch('http://localhost:5024/api/public/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(userData)
-                });
+            // 禁用提交按钮防止重复提交
+            const submitBtn = document.querySelector('.btn-submit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '注册中...';
+            }
 
-                const result = await response.json();
+            try {
+                console.log('📤 发送注册请求...', JSON.stringify(userData));
+                console.log('📍 当前页面地址:', window.location.href);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    console.log('⏰ 请求超时，中止...');
+                    controller.abort();
+                }, 15000);
+                
+                const response = await fetch('http://127.0.0.1:5024/api/public/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData),
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+                
+                clearTimeout(timeoutId);
+                console.log('📥 响应状态:', response.status);
+                console.log('📥 响应头:', [...response.headers.entries()]);
+                
+                const text = await response.text();
+                console.log('📥 原始响应:', text);
+                
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch(e) {
+                    console.error('JSON解析失败:', e);
+                    throw new Error('服务器返回无效JSON: ' + text.substring(0, 100));
+                }
+                console.log('📋 返回数据:', result);
+
+                // 恢复按钮
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '立即注册';
+                }
 
                 if (result.success) {
-                    closeRegisterModal();
-                    alert(`注册成功！\n\n用户名：${userData.username}\n密码：${userData.password}\n\n您现在可以使用此账号登录系统。`);
+                    console.log('✅ 注册成功!');
+                    // 关闭注册框
+                    const modal = document.getElementById('register-modal');
+                    if (modal) modal.remove();
+                    
+                    // 直接用 alert 显示
+                    window.alert('注册成功！\n\n用户名：' + userData.username + '\n密码：' + userData.password + '\n\n现在可以登录了');
                 } else {
-                    alert('注册失败：' + (result.message || '未知错误'));
+                    console.log('❌ 注册失败:', result.message);
+                    window.alert('注册失败：' + (result.message || '未知错误'));
                 }
+                
             } catch (error) {
-                console.error('注册失败:', error);
-                alert('注册失败：' + error.message);
+                console.error('❌ 请求错误:', error);
+                // 恢复按钮
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '立即注册';
+                }
+                window.alert('注册失败：' + error.message);
             }
         }
     </script>

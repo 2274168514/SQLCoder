@@ -6,7 +6,7 @@
 
 // 默认端口配置
 const API_PORT = 5024;
-const API_BASE = `http://localhost:${API_PORT}/api`;
+const API_BASE = `http://127.0.0.1:${API_PORT}/api`;
 
 export const USER_ROLES = {
   ADMIN: 'admin',
@@ -145,7 +145,17 @@ export class UserAuth {
    * 用户登录
    */
   async login(username, password) {
+    console.log('🔐 开始登录请求...');
+    const startTime = Date.now();
+    
     try {
+      // 创建超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ 登录请求超时，取消请求');
+        controller.abort();
+      }, 30000); // 30秒超时
+
       // 使用专门的登录API
       const response = await fetch(`${API_BASE}/users/login`, {
         method: 'POST',
@@ -155,8 +165,12 @@ export class UserAuth {
         body: JSON.stringify({
           username: username.trim(),
           password: password
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+      console.log(`📡 收到响应: ${response.status} (${Date.now() - startTime}ms)`);
 
       const result = await response.json();
 
@@ -170,7 +184,7 @@ export class UserAuth {
         localStorage.setItem('currentUser', userStr);
         localStorage.setItem('oj-current-user', userStr); // 为向后兼容
 
-        console.log('✅ 用户信息已保存到所有存储位置');
+        console.log('✅ 登录成功，用户信息已保存');
 
         return {
           success: true,
@@ -178,6 +192,7 @@ export class UserAuth {
           user: this.currentUser
         };
       } else {
+        console.log('❌ 登录失败:', result.message);
         return {
           success: false,
           message: result.message
@@ -185,9 +200,24 @@ export class UserAuth {
       }
     } catch (error) {
       console.error('登录过程中发生错误:', error);
+      
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          message: '登录超时，服务器响应过慢，请检查网络连接'
+        };
+      }
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        return {
+          success: false,
+          message: '无法连接服务器，请确保后端服务已启动'
+        };
+      }
+      
       return {
         success: false,
-        message: '登录过程中发生错误，请重试'
+        message: '登录失败: ' + error.message
       };
     }
   }

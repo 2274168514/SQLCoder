@@ -669,6 +669,22 @@
           totalAssignments: '作业总数',
           completedAssignments: '已完成作业',
           averageScore: '平均分',
+          accountSettings: '账户设置',
+          securitySettings: '安全设置',
+          personalInfo: '个人信息',
+          contactInfo: '联系方式',
+          academicInfo: '学术信息',
+          workInfo: '工作信息',
+          systemInfo: '系统信息',
+          profileUpdated: '资料更新成功',
+          profileUpdateFailed: '资料更新失败',
+          uploadPhoto: '上传照片',
+          removePhoto: '移除照片',
+          memberSince: '注册时间',
+          accountStatus: '账户状态',
+          roleType: '角色类型',
+          verified: '已验证',
+          unverified: '未验证',
           // 通用状态和操作
           admin: '管理员',
           unknown: '未知',
@@ -743,7 +759,29 @@
           pendingAssignments: '待完成',
           myProgress: '我的进度',
           completed: '已完成',
-          completionRate: '完成率'
+          completionRate: '完成率',
+          // 作业提交详情
+          submissionStatus: '提交状态',
+          submissionDetails: '提交详情',
+          assignmentInfo: '作业信息',
+          assignedStudents: '分配学生',
+          graded: '已批改',
+          noSubmission: '未提交',
+          viewSubmission: '查看提交',
+          viewCode: '查看代码',
+          gradeSubmission: '批改作业',
+          notSet: '未设置',
+          copies: '份',
+          score: '分数',
+          points: '分',
+          scorePlaceholder: '分数',
+          modify: '修改',
+          updateScore: '更新分数',
+          update: '更新',
+          unknownMajor: '未知专业',
+          noAssignedStudents: '暂无分配的学生',
+          apiError: 'API连接错误',
+          colon: '：'
         },
         en: {
           pageTitle: 'Dashboard',
@@ -979,6 +1017,22 @@
           totalAssignments: 'Total Assignments',
           completedAssignments: 'Completed Assignments',
           averageScore: 'Average Score',
+          accountSettings: 'Account Settings',
+          securitySettings: 'Security Settings',
+          personalInfo: 'Personal Information',
+          contactInfo: 'Contact Information',
+          academicInfo: 'Academic Information',
+          workInfo: 'Work Information',
+          systemInfo: 'System Information',
+          profileUpdated: 'Profile updated successfully',
+          profileUpdateFailed: 'Profile update failed',
+          uploadPhoto: 'Upload Photo',
+          removePhoto: 'Remove Photo',
+          memberSince: 'Member Since',
+          accountStatus: 'Account Status',
+          roleType: 'Role Type',
+          verified: 'Verified',
+          unverified: 'Unverified',
           // 通用状态和操作
           admin: 'Administrator',
           unknown: 'Unknown',
@@ -1106,9 +1160,9 @@
         localStorage.setItem('preferred-language', this.currentLanguage);
         localStorage.setItem('global-language-preference', this.currentLanguage);
         
-        // 同步到全局设置
+        // 同步到全局设置 - 直接设置内部值避免触发setter
         if (window.globalSettings) {
-          window.globalSettings.language = this.currentLanguage;
+          window.globalSettings._language = this.currentLanguage;
         }
         
         this.updateLanguage();
@@ -1122,6 +1176,10 @@
           localStorage.setItem('language', lang);
           localStorage.setItem('preferred-language', lang);
           localStorage.setItem('global-language-preference', lang);
+          // 同步到全局设置 - 直接设置内部值避免触发setter
+          if (window.globalSettings) {
+            window.globalSettings._language = lang;
+          }
           this.updateLanguage();
         }
       },
@@ -1188,30 +1246,6 @@
 
         // 处理动态内容翻译
         this.applyToDynamicContent();
-
-        // 如果当前在学生管理或教师管理页面，重新加载内容以确保翻译正确
-        const pageContent = document.getElementById('page-content');
-        if (pageContent) {
-          const currentPageTitle = pageContent.querySelector('h2');
-          if (currentPageTitle) {
-            const titleText = currentPageTitle.textContent;
-            if (titleText.includes(this.t('studentManagement')) || titleText.includes(this.t('teacherManagement'))) {
-              // 重新加载当前页面以应用新的语言设置
-              const currentPageBtn = document.querySelector('.nav-item.active');
-              if (currentPageBtn && currentPageBtn.getAttribute('data-page')) {
-                const pageId = currentPageBtn.getAttribute('data-page');
-                if (pageId === 'students' || pageId === 'teachers') {
-                  console.log('Reloading page content for language change:', pageId);
-                  setTimeout(() => {
-                    if (window.app && window.app.loadUsersPage) {
-                      window.app.loadUsersPage(pageId);
-                    }
-                  }, 100);
-                }
-              }
-            }
-          }
-        }
 
         console.log('Language update completed');
       },
@@ -1296,7 +1330,7 @@
       }
 
       // 防抖处理
-      if (toggleLanguage.lastClick && (Date.now() - toggleLanguage.lastClick < 300)) {
+      if (toggleLanguage.lastClick && (Date.now() - toggleLanguage.lastClick < 500)) {
         console.log('Language toggle clicked too quickly, ignoring');
         return;
       }
@@ -1304,11 +1338,6 @@
 
       console.log('Toggling language from', i18n.currentLanguage);
       i18n.toggle();
-      
-      // 同步到全局设置
-      if (window.globalSettings) {
-        window.globalSettings.language = i18n.currentLanguage;
-      }
     }
 
     // 主题切换函数

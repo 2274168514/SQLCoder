@@ -278,9 +278,16 @@
      * 更新带 data-i18n 属性的元素
      */
     _updateI18nElements(lang) {
-      // 如果页面有 i18n 对象，使用它来翻译
-      if (window.i18n && typeof window.i18n.setLanguage === 'function') {
-        window.i18n.setLanguage(lang);
+      // 如果页面有 i18n 对象且语言不同，使用它来翻译
+      if (window.i18n && typeof window.i18n.currentLanguage !== 'undefined') {
+        // 检查语言是否已经是目标语言，避免重复设置
+        if (window.i18n.currentLanguage !== lang) {
+          // 直接设置语言，不通过setter避免循环
+          window.i18n.currentLanguage = lang;
+          if (typeof window.i18n.updateLanguage === 'function') {
+            window.i18n.updateLanguage();
+          }
+        }
         return;
       }
 

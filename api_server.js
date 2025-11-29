@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5024;
 
 // 数据库配置
 const dbConfig = {
-    host: 'localhost',
+    host: '127.0.0.1',    // 使用IP地址而不localhost，避免DNS解析延迟
     port: 3306,
     user: 'root',
     password: '123123',
@@ -95,13 +95,16 @@ const performanceMonitor = {
     }
 };
 
-// 中间件 - 配置CORS允许前端访问
+// 中间件 - 配置CORS允许所有来源访问（开发环境）
 app.use(cors({
-  origin: ['http://localhost:5020', 'http://localhost:5021', 'http://localhost:5024', 'http://localhost:5025', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:5020', 'http://127.0.0.1:5021', 'http://127.0.0.1:5024', 'http://127.0.0.1:5025', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002'],
+  origin: true,  // 允许所有来源，包括 file:// 协议
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// 额外处理预检请求
+app.options('*', cors());
 app.use(bodyParser.json({ limit: '200mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '200mb' }));
 
@@ -245,28 +248,62 @@ app.use((error, req, res, next) => {
 
 // 数据库连接池
 let pool;
+let isReconnecting = false;
+
+// 检查并重新初始化数据库连接
+async function ensureDbConnection() {
+    if (!pool) {
+        console.log('⚠️ 数据库连接池不存在，正在初始化...');
+        await initDatabase();
+        return;
+    }
+    
+    try {
+        // 简单的健康检查
+        await pool.execute('SELECT 1');
+    } catch (error) {
+        console.error('❌ 数据库连接检查失败:', error.message);
+        if (!isReconnecting) {
+            isReconnecting = true;
+            console.log('🔄 正在重新初始化数据库连接...');
+            await initDatabase();
+            isReconnecting = false;
+        }
+    }
+}
 
 async function initDatabase() {
     try {
-        // 首先尝试不使用连接池测试连接
-        const connection = await mysql.createConnection(dbConfig);
-        await connection.ping();
-        await connection.end();
-
-        // 然后创建连接池（支持高并发）
+        console.log('🔗 正在连接数据库...');
+        
+        // 创建连接池（预留连接以加快响应）
         pool = mysql.createPool({
             ...dbConfig,
             waitForConnections: true,
-            connectionLimit: 50,      // 增加到50个并发连接
-            queueLimit: 100,          // 设置队列限制为100
-            acquireTimeout: 60000,    // 获取连接超时时间（60秒）
-            timeout: 60000,           // 查询超时时间（60秒）
-            reconnect: true,          // 自动重连
-            idleTimeout: 300000,      // 空闲连接超时时间（5分钟）
-            maxIdle: 10               // 最大空闲连接数
+            connectionLimit: 50,       // 50个并发连接
+            queueLimit: 0,             // 不限制队列
+            connectTimeout: 5000,      // 连接超时 5秒
+            acquireTimeout: 5000,      // 获取连接超时 5秒
+            enableKeepAlive: true,     // 保持连接活跃
+            keepAliveInitialDelay: 5000, // 5秒心跳
+            maxIdle: 10,               // 保持更多空闲连接
+            idleTimeout: 60000         // 空闲超时1分钟
         });
 
-        console.log('✅ 数据库连接成功');
+        // 预热连接池 - 创建几个连接备用
+        console.log('🔥 预热数据库连接...');
+        const warmupPromises = [];
+        for (let i = 0; i < 5; i++) {
+            warmupPromises.push(pool.execute('SELECT 1'));
+        }
+        await Promise.all(warmupPromises);
+
+        // 监听连接池错误
+        pool.on('error', (err) => {
+            console.error('❌ 数据库连接池错误:', err.message);
+        });
+
+        console.log('✅ 数据库连接成功，连接池已预热');
         return true;
     } catch (error) {
         console.error('❌ 数据库连接失败:', error.message);
@@ -832,19 +869,25 @@ function setupDocumentRoutes() {
 // 数据库查询函数
 async function query(sql, params = []) {
     if (!pool) {
+        console.error('❌ 数据库连接池未初始化！');
         throw new Error('数据库连接池未初始化');
     }
 
     // 记录数据库查询
     performanceMonitor.recordDBQuery();
+    const startTime = Date.now();
 
     try {
         const [rows] = await pool.execute(sql, params);
+        const duration = Date.now() - startTime;
+        if (duration > 1000) {
+            console.warn(`⚠️ 慢查询 (${duration}ms): ${sql.substring(0, 50)}...`);
+        }
         return rows;
     } catch (error) {
-        // 记录数据库错误
         performanceMonitor.recordDBError();
         console.error('❌ 数据库查询错误:', error.message);
+        console.error('   SQL:', sql.substring(0, 100));
         throw new Error(`数据库查询失败: ${error.message}`);
     }
 }
@@ -1038,6 +1081,9 @@ async function checkAndAddUserTableFields() {
 
 // 用户登录API
 app.post('/api/users/login', async (req, res) => {
+    const startTime = Date.now();
+    console.log('🔐 收到登录请求');
+    
     try {
         const { username, password } = req.body;
 
@@ -1051,12 +1097,16 @@ app.post('/api/users/login', async (req, res) => {
         console.log(`🔐 登录请求: ${username}`);
 
         // 查询用户
+        console.log('📊 查询数据库...');
+        const dbStartTime = Date.now();
         const users = await query(
             'SELECT id, username, email, password_hash, full_name, role, student_id, employee_id, is_active, last_login FROM users WHERE username = ? OR email = ?',
             [username, username]
         );
+        console.log(`📊 数据库查询完成 (${Date.now() - dbStartTime}ms)`);
 
         if (users.length === 0) {
+            console.log(`❌ 用户不存在: ${username}`);
             return res.status(401).json({
                 success: false,
                 message: '用户名或密码错误'
@@ -1066,6 +1116,7 @@ app.post('/api/users/login', async (req, res) => {
         const user = users[0];
 
         if (!user.is_active) {
+            console.log(`❌ 用户已禁用: ${username}`);
             return res.status(401).json({
                 success: false,
                 message: '用户账户已被禁用'
@@ -1074,17 +1125,16 @@ app.post('/api/users/login', async (req, res) => {
 
         // 验证密码 - 暂时使用明文比较
         if (password !== user.password_hash) {
+            console.log(`❌ 密码错误: ${username}`);
             return res.status(401).json({
                 success: false,
                 message: '用户名或密码错误'
             });
         }
 
-        // 更新最后登录时间
-        await query(
-            'UPDATE users SET last_login = NOW() WHERE id = ?',
-            [user.id]
-        );
+        // 更新最后登录时间（异步执行，不阻塞响应）
+        query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id])
+            .catch(err => console.error('更新登录时间失败:', err));
 
         // 返回用户信息（不包含密码）
         const userResponse = {
@@ -1098,6 +1148,9 @@ app.post('/api/users/login', async (req, res) => {
             isActive: user.is_active,
             lastLogin: user.last_login
         };
+
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ 登录成功: ${username} (${totalTime}ms)`);
 
         res.json({
             success: true,
@@ -1187,11 +1240,15 @@ app.get('/api/users/me', async (req, res) => {
 
 // 公开用户注册API（任何人都可以注册）
 app.post('/api/public/register', async (req, res) => {
+    console.log('📝 收到注册请求:', req.body?.username);
+    const startTime = Date.now();
+    
     try {
         const { username, email, password, fullName, role, studentId, employeeId, department, phone, major, grade } = req.body;
 
         // 参数验证 - 邮箱不再是必填项
         if (!username || !password || !fullName || !role) {
+            console.log('❌ 注册失败: 缺少必要参数');
             return res.status(400).json({
                 success: false,
                 message: '缺少必要参数'
@@ -1200,6 +1257,7 @@ app.post('/api/public/register', async (req, res) => {
 
         // 限制只能注册学生和教师角色
         if (!['student', 'teacher'].includes(role)) {
+            console.log('❌ 注册失败: 无效角色', role);
             return res.status(400).json({
                 success: false,
                 message: '公开注册只支持学生和教师角色'
@@ -1207,12 +1265,14 @@ app.post('/api/public/register', async (req, res) => {
         }
 
         // 只检查用户名是否已存在，不检查邮箱
+        console.log('🔍 检查用户名是否存在...');
         const existingUser = await query(
             'SELECT id FROM users WHERE username = ?',
             [username]
         );
 
         if (existingUser.length > 0) {
+            console.log('❌ 注册失败: 用户名已存在', username);
             return res.status(409).json({
                 success: false,
                 message: '用户名已存在'
@@ -1234,13 +1294,15 @@ app.post('/api/public/register', async (req, res) => {
         const defaultEmail = email || `${username}@example.com`;
 
         // 创建用户
+        console.log('📝 正在创建用户...');
         const result = await query(
             `INSERT INTO users (username, email, password_hash, full_name, role, student_id, employee_id, department, phone, major, grade)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [username, defaultEmail, passwordHash, fullName, role, studentId || null, employeeId || null, department || null, phone || null, major || null, grade || null]
         );
 
-        console.log(`✅ 新用户注册成功: ${username} (${role})`);
+        const duration = Date.now() - startTime;
+        console.log(`✅ 新用户注册成功: ${username} (${role}) - 耗时 ${duration}ms`);
 
         res.json({
             success: true,
@@ -2568,6 +2630,30 @@ app.get('/api/test', (req, res) => {
     });
 });
 
+// 健康检查端点 - 检查服务器和数据库状态
+app.get('/api/health', async (req, res) => {
+    const health = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        server: true,
+        database: false,
+        dbLatency: null
+    };
+    
+    try {
+        const dbStart = Date.now();
+        await pool.execute('SELECT 1');
+        health.database = true;
+        health.dbLatency = Date.now() - dbStart;
+    } catch (error) {
+        health.status = 'degraded';
+        health.database = false;
+        health.dbError = error.message;
+    }
+    
+    res.json(health);
+});
+
 // 默认路由 - 服务器首页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'login.html'));
@@ -3314,21 +3400,40 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
         console.log(`\n🌟 服务器启动成功！`);
         console.log(`📡 服务器运行在: http://localhost:${PORT}`);
         console.log(`🔗 API端点: http://localhost:${PORT}/api`);
         console.log(`🏠 首页: http://localhost:${PORT}`);
+        
+        // 启动后立即测试数据库连接
+        console.log(`\n🔍 测试数据库连接...`);
+        try {
+            const testStart = Date.now();
+            const result = await query('SELECT COUNT(*) as count FROM users');
+            const testDuration = Date.now() - testStart;
+            console.log(`✅ 数据库测试成功！用户数: ${result[0].count}, 耗时: ${testDuration}ms`);
+        } catch (err) {
+            console.error(`❌ 数据库测试失败: ${err.message}`);
+            console.error(`   请检查 MySQL 服务是否运行，数据库配置是否正确`);
+        }
+        
         console.log(`\n📋 可用API端点:`);
         console.log(`   POST http://localhost:${PORT}/api/users/login (登录)`);
-        console.log(`   POST http://localhost:${PORT}/api/users/register (注册)`);
+        console.log(`   POST http://localhost:${PORT}/api/public/register (公开注册)`);
         console.log(`   GET  http://localhost:${PORT}/api/test (测试)`);
-        console.log(`   GET  http://localhost:${PORT}/api/stats/performance (性能统计)`);
-        console.log(`   GET  http://localhost:${PORT}/api/stats/database (数据库状态)`);
-        console.log(`   GET  http://localhost:${PORT}/api/stats/system (系统资源)`);
-        console.log(`   GET  http://localhost:${PORT}/api/stats/dashboard (监控仪表盘)`);
+        console.log(`   GET  http://localhost:${PORT}/api/health (健康检查)`);
         console.log(`\n💾 当前模式: 数据库模式`);
-        console.log(`⚡ 数据库连接池: 最大50个连接，支持高并发访问`);
+        console.log(`⚡ 数据库连接池: 最大50个连接`);
+        
+        // 定时检查数据库连接（每60秒）
+        setInterval(async () => {
+            try {
+                await ensureDbConnection();
+            } catch (e) {
+                console.error('⚠️ 数据库健康检查失败:', e.message);
+            }
+        }, 60000);
     });
 }
 
